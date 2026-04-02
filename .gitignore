@@ -1,0 +1,57 @@
+# =========================
+# Éditeurs et OS (Cursor, VSCode, Mac, Windows)
+# =========================
+.vscode/
+.cursor/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# =========================
+# Backend (Python / FastAPI)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.pytest_cache/
+
+# =========================
+# Frontend (Node.js / Vue 3)
+# =========================
+node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Sécurité (Variables d'environnement)
+# =========================
+# Ne JAMAIS commiter les fichiers .env car ils contiennent tes clés et mots de passe
+.env
+.env.*
+!.env.example 
+
+# =========================
+# Vellucast : Base de données et Médias
+# =========================
+# On ignore la DB pour ne pas écraser tes données de prod ou partager tes logs
+*.sqlite
+*.sqlite3
+*.db
+
+# On ignore les dossiers de stockage vidéo et les fichiers temporaires FFmpeg
+/films/
+/series/
+/archives/
+/media/
+*.tmp.mp4
+*.mp4
+*.mkv
+*.avi
