@@ -39,81 +39,40 @@
           </p>
         </header>
 
-        <div
-          class="grid w-full max-w-4xl gap-6 sm:grid-cols-2 sm:gap-8"
+        <article
+          class="group flex w-full max-w-md flex-col rounded-3xl border border-slate-200/80 bg-white p-8 shadow-2xl shadow-indigo-500/10 ring-1 ring-slate-200/60 transition duration-300 hover:shadow-indigo-500/15 hover:ring-indigo-200/80"
         >
-          <!-- Carte accès interne -->
-          <article
-            class="group flex flex-col rounded-3xl border border-slate-200/80 bg-white p-8 shadow-2xl shadow-indigo-500/10 ring-1 ring-slate-200/60 transition duration-300 hover:shadow-indigo-500/15 hover:ring-indigo-200/80"
+          <div
+            class="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/35"
           >
-            <div
-              class="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/35"
+            <svg
+              class="h-8 w-8"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              aria-hidden="true"
             >
-              <svg
-                class="h-8 w-8"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-                />
-              </svg>
-            </div>
-            <h2 class="text-xl font-semibold text-slate-900">Accès utilisateur</h2>
-            <p class="mt-2 flex-1 text-slate-600 leading-relaxed">
-              Connexion sécurisée pour les comptes internes.
-            </p>
-            <button
-              type="button"
-              class="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/35 transition hover:scale-[1.02] hover:from-indigo-500 hover:to-blue-500 hover:shadow-xl hover:shadow-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:scale-[0.98]"
-              @click="view = 'login'"
-            >
-              Se connecter
-            </button>
-          </article>
-
-          <!-- Carte accès temporaire -->
-          <article
-            class="group flex flex-col rounded-3xl border border-slate-200/80 bg-white p-8 shadow-2xl shadow-violet-500/10 ring-1 ring-slate-200/60 transition duration-300 hover:shadow-violet-500/15 hover:ring-violet-200/80"
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+              />
+            </svg>
+          </div>
+          <h2 class="text-xl font-semibold text-slate-900">Se connecter</h2>
+          <p class="mt-2 flex-1 text-slate-600 leading-relaxed">
+            Connexion par compte, ou via un lien d'accès temporaire.
+          </p>
+          <button
+            type="button"
+            class="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/35 transition hover:scale-[1.02] hover:from-indigo-500 hover:to-blue-500 hover:shadow-xl hover:shadow-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:scale-[0.98]"
+            @click="goLogin('account')"
           >
-            <div
-              class="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/35"
-            >
-              <svg
-                class="h-8 w-8"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
-                />
-              </svg>
-            </div>
-            <h2 class="text-xl font-semibold text-slate-900">Accès temporaire</h2>
-            <p class="mt-2 flex-1 text-slate-600 leading-relaxed">
-              Utiliser un lien invité avec token ou code d'accès.
-            </p>
-            <button
-              type="button"
-              class="btn-outline mt-6 inline-flex w-full items-center justify-center rounded-2xl border-2 border-indigo-500 bg-white px-5 py-3.5 text-sm font-semibold text-indigo-600 shadow-sm transition hover:border-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:scale-[0.98]"
-              @click="view = 'guest'"
-            >
-              Utiliser un accès temporaire
-            </button>
-          </article>
-        </div>
+            Se connecter
+          </button>
+        </article>
       </section>
 
       <section
@@ -121,8 +80,30 @@
         key="login"
         class="mx-auto mt-8 max-w-md rounded-3xl border border-slate-200/80 bg-white p-8 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-200/60 sm:mt-12"
       >
-        <h2 class="text-xl font-semibold text-slate-900">Connexion utilisateur</h2>
-        <form @submit.prevent="loginUser">
+        <h2 class="text-xl font-semibold text-slate-900">Connexion</h2>
+
+        <!-- Onglets : compte classique / lien temporaire -->
+        <div class="login-tabs" role="tablist">
+          <button
+            type="button"
+            class="login-tab"
+            :class="{ 'login-tab--active': loginMode === 'account' }"
+            @click="setLoginMode('account')"
+          >
+            Compte
+          </button>
+          <button
+            type="button"
+            class="login-tab"
+            :class="{ 'login-tab--active': loginMode === 'token' }"
+            @click="setLoginMode('token')"
+          >
+            Lien temporaire
+          </button>
+        </div>
+
+        <!-- Connexion par compte -->
+        <form v-if="loginMode === 'account'" @submit.prevent="loginUser">
           <label>
             Nom d'utilisateur
             <input v-model="userForm.username" type="text" autocomplete="username" />
@@ -131,33 +112,46 @@
             Mot de passe
             <input v-model="userForm.password" type="password" autocomplete="current-password" />
           </label>
+          <p v-if="loginError" class="login-error">{{ loginError }}</p>
           <div class="row mt-2">
             <button type="submit" class="btn-primary">Se connecter</button>
+            <button type="button" class="btn-outline" @click="view = 'home'">Retour</button>
+          </div>
+        </form>
+
+        <!-- Connexion par lien temporaire (token + mot de passe du lien facultatif) -->
+        <form v-else @submit.prevent="loginGuest">
+          <label>
+            Token du lien
+            <input v-model="guestForm.token" type="text" />
+          </label>
+          <label>
+            Mot de passe du lien (si défini)
+            <input v-model="guestForm.access_code" type="password" />
+          </label>
+          <p v-if="guestError" class="login-error">{{ guestError }}</p>
+          <div class="row mt-2">
+            <button type="submit" class="btn-primary">Accéder</button>
             <button type="button" class="btn-outline" @click="view = 'home'">Retour</button>
           </div>
         </form>
       </section>
 
       <section
-        v-else-if="view === 'guest'"
-        key="guest"
-        class="mx-auto mt-8 max-w-md rounded-3xl border border-slate-200/80 bg-white p-8 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-200/60 sm:mt-12"
+        v-else-if="view === 'guest-dashboard'"
+        key="guest-dashboard"
+        class="guest-dashboard w-full px-4 py-5 sm:px-6 lg:px-10"
       >
-        <h2 class="text-xl font-semibold text-slate-900">Accès temporaire</h2>
-        <form @submit.prevent="loginGuest">
-          <label>
-            Token d'accès
-            <input v-model="guestForm.token" type="text" />
-          </label>
-          <label>
-            Code d'accès (optionnel)
-            <input v-model="guestForm.access_code" type="text" />
-          </label>
-          <div class="row mt-2">
-            <button type="submit" class="btn-primary">Accéder</button>
-            <button type="button" class="btn-outline" @click="view = 'home'">Retour</button>
+        <nav class="nav">
+          <div class="nav-left">
+            <span class="app-brand" title="Vellucast">Vellucast</span>
+            <span class="role">Invité</span>
           </div>
-        </form>
+          <div class="nav-actions">
+            <button class="ghost" @click="exitGuest">Quitter</button>
+          </div>
+        </nav>
+        <GuestLibrary :token="token" :contents="guestContents" />
       </section>
 
       <section
@@ -173,14 +167,14 @@
         </button>
       </section>
 
-      <section v-else key="dashboard" class="dashboard mx-auto max-w-6xl px-4 py-6">
+      <section v-else key="dashboard" class="dashboard w-full px-4 py-5 sm:px-6 lg:px-10">
         <nav class="nav">
           <div class="nav-left">
             <span class="app-brand" title="Vellucast">Vellucast</span>
             <strong class="nav-user">{{ user?.username }}</strong>
             <span class="role">{{ user?.role }}</span>
             <button
-              v-if="user?.role === 'admin' && dashboardView === 'settings'"
+              v-if="dashboardView === 'settings'"
               type="button"
               class="ghost"
               @click="dashboardView = 'library'"
@@ -190,7 +184,7 @@
           </div>
           <div class="nav-actions">
             <button
-              v-if="user?.role === 'admin' && dashboardView === 'library'"
+              v-if="dashboardView === 'library'"
               type="button"
               class="ghost text-xl leading-none"
               title="Paramètres"
@@ -199,31 +193,9 @@
             >
               ⚙️
             </button>
-            <button class="ghost" @click="showPassword = !showPassword">
-              Changer le mot de passe
-            </button>
             <button class="ghost" @click="logout">Se déconnecter</button>
           </div>
         </nav>
-
-        <section v-if="showPassword" class="card">
-          <h2>Changer le mot de passe</h2>
-          <form @submit.prevent="changePassword">
-            <label>
-              Mot de passe actuel
-              <input v-model="passwordForm.current_password" type="password" />
-            </label>
-            <label>
-              Nouveau mot de passe
-              <input v-model="passwordForm.new_password" type="password" />
-            </label>
-            <label>
-              Confirmation
-              <input v-model="passwordForm.new_password_confirm" type="password" />
-            </label>
-            <button type="submit" class="btn-primary">Mettre à jour</button>
-          </form>
-        </section>
 
         <template v-if="dashboardView === 'library'">
           <transition name="fade-slide" mode="out-in">
@@ -262,6 +234,7 @@ import Library from "./components/Library.vue";
 import Settings from "./components/Settings.vue";
 import VideoPlayer from "./components/VideoPlayer.vue";
 import UploadMediaModal from "./components/UploadMediaModal.vue";
+import GuestLibrary from "./components/GuestLibrary.vue";
 import { API_BASE } from "./config.js";
 
 /** Normalise le champ FastAPI `detail` (string ou liste de validation). */
@@ -279,7 +252,7 @@ function formatApiDetail(data) {
 }
 
 export default {
-  components: { Library, Settings, VideoPlayer, UploadMediaModal },
+  components: { Library, Settings, VideoPlayer, UploadMediaModal, GuestLibrary },
   provide() {
     return {
       dashboardApp: this,
@@ -288,6 +261,9 @@ export default {
   data() {
     return {
       view: "home",
+      loginMode: "account",
+      loginError: "",
+      guestError: "",
       userForm: { username: "", password: "" },
       guestForm: { token: "", access_code: "" },
       token: "",
@@ -298,6 +274,7 @@ export default {
       showPassword: false,
       lastShareToken: "",
       guestContent: null,
+      guestContents: [],
       guestStatusTitle: "Accès invité",
       guestStatusMessage: "",
       passwordForm: {
@@ -338,6 +315,7 @@ export default {
       },
       shareForm: {
         content_id: "",
+        content_ids: [],
         expires_in_value: 7,
         expires_in_unit: "days",
         max_uses: 1,
@@ -349,10 +327,92 @@ export default {
       dashboardView: "library",
     };
   },
+  async mounted() {
+    await this.restoreSession();
+  },
   methods: {
+    persistSession() {
+      try {
+        localStorage.setItem(
+          "vellucast_session",
+          JSON.stringify({ token: this.token, user: this.user }),
+        );
+      } catch (e) {
+        /* localStorage indisponible : on continue sans persistance */
+      }
+    },
+    clearSession() {
+      try {
+        localStorage.removeItem("vellucast_session");
+      } catch (e) {
+        /* no-op */
+      }
+    },
+    async restoreSession() {
+      // 1) Session invité : restaurée tant que le jeton vit ; détruite dès qu'il meurt (401).
+      let guest = null;
+      try {
+        guest = JSON.parse(localStorage.getItem("vellucast_guest") || "null");
+      } catch (e) {
+        guest = null;
+      }
+      if (guest && guest.token) {
+        try {
+          const res = await fetch(`${API_BASE}/auth/me`, {
+            headers: { Authorization: `Bearer ${guest.token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user?.role === "guest") {
+              this.token = guest.token;
+              this.guestContents = Array.isArray(guest.contents) ? guest.contents : [];
+              this.user = { username: "Invité", role: "guest" };
+              this.view = "guest-dashboard";
+              return;
+            }
+          }
+          this.clearGuestSession(); // jeton mort → session détruite
+        } catch (e) {
+          this.clearGuestSession();
+        }
+      }
+
+      // 2) Session « compte » classique.
+      // Le cookie cesse de marcher dès que le jeton est expiré/invalide (401 → on nettoie).
+      let saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem("vellucast_session") || "null");
+      } catch (e) {
+        saved = null;
+      }
+      if (!saved || !saved.token) return;
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, {
+          headers: { Authorization: `Bearer ${saved.token}` },
+        });
+        if (!res.ok) {
+          this.clearSession();
+          return;
+        }
+        const data = await res.json();
+        this.token = saved.token;
+        this.user = data.user || saved.user || null;
+        this.view = "dashboard";
+        this.dashboardView = "library";
+        await this.loadContents();
+        if (this.user?.role === "admin") {
+          await this.loadUsers();
+          await this.loadShares();
+        }
+      } catch (e) {
+        this.clearSession();
+      }
+    },
     async onMediaUploaded() {
       await this.loadContents();
       this.showUploadModal = false;
+      // Notifie la bibliothèque pour qu'elle rafraîchisse sa propre liste.
+      window.dispatchEvent(new Event("vellucast-contents-changed"));
     },
     onSelectContent(content) {
       this.selectedContent = content;
@@ -362,17 +422,34 @@ export default {
       this.selectedContent = null;
       this.browseView = "catalog";
     },
+    goLogin(mode = "account") {
+      this.loginError = "";
+      this.guestError = "";
+      this.loginMode = mode === "token" ? "token" : "account";
+      this.view = "login";
+    },
+    setLoginMode(mode) {
+      this.loginMode = mode === "token" ? "token" : "account";
+      this.loginError = "";
+      this.guestError = "";
+    },
     async loginUser() {
+      this.loginError = "";
       try {
         const response = await fetch(`${API_BASE}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(this.userForm),
         });
-        const data = await response.json();
-        console.log("loginUser", data);
-        this.token = data.token || "";
+        const data = await response.json().catch(() => ({}));
+        // Échec : on reste sur l'écran de connexion avec un message inline.
+        if (!response.ok || !data.token) {
+          this.loginError = formatApiDetail(data) || "Identifiants invalides.";
+          return;
+        }
+        this.token = data.token;
         this.user = data.user || null;
+        this.persistSession();
         this.view = "dashboard";
         this.dashboardView = "library";
         await this.loadContents();
@@ -381,36 +458,57 @@ export default {
           await this.loadShares();
         }
       } catch (error) {
-        console.error("loginUser error", error);
+        this.loginError = "Impossible de joindre le serveur.";
       }
     },
     async loginGuest() {
+      this.guestError = "";
       try {
         const response = await fetch(`${API_BASE}/auth/guest`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(this.guestForm),
         });
-        const data = await response.json();
-        console.log("loginGuest", data);
-        if (!response.ok) {
-          const detail = data?.detail || "Accès refusé";
-          if (detail.includes("expire") || detail.includes("deja utilise")) {
-            this.guestStatusTitle = "Accès expiré";
-          } else {
-            this.guestStatusTitle = "Accès refusé";
-          }
-          this.guestStatusMessage = detail;
-          this.guestContent = null;
-        } else {
-          this.guestStatusTitle = "Accès invité validé";
-          this.guestStatusMessage = "Le lien est valide.";
-          this.guestContent = data.content || null;
+        const data = await response.json().catch(() => ({}));
+        // Échec : on reste sur l'écran de connexion (onglet lien) avec un message inline.
+        if (!response.ok || !data.token) {
+          this.guestError = formatApiDetail(data) || "Lien ou mot de passe invalide.";
+          return;
         }
-        this.view = "guest-result";
+        // Le serveur renvoie un jeton invité scopé + la liste des contenus autorisés.
+        this.token = data.token;
+        this.guestContents = Array.isArray(data.contents) ? data.contents : [];
+        this.user = { username: "Invité", role: "guest" };
+        this.persistGuestSession();
+        this.view = "guest-dashboard";
       } catch (error) {
-        console.error("loginGuest error", error);
+        this.guestError = "Impossible de joindre le serveur.";
       }
+    },
+    persistGuestSession() {
+      try {
+        localStorage.setItem(
+          "vellucast_guest",
+          JSON.stringify({ token: this.token, contents: this.guestContents }),
+        );
+      } catch (e) {
+        /* no-op */
+      }
+    },
+    clearGuestSession() {
+      try {
+        localStorage.removeItem("vellucast_guest");
+      } catch (e) {
+        /* no-op */
+      }
+    },
+    exitGuest() {
+      // Quitter la session invité (le jeton reste valide jusqu'à son expiration côté serveur).
+      this.clearGuestSession();
+      this.token = "";
+      this.user = null;
+      this.guestContents = [];
+      this.view = "home";
     },
     async changePassword() {
       if (this.passwordForm.new_password !== this.passwordForm.new_password_confirm) {
@@ -690,6 +788,7 @@ export default {
           };
         }
         this.lastShareToken = data.token || "";
+        this.shareForm.content_ids = [];
         await this.loadShares();
         return { ok: true };
       } catch (error) {
@@ -766,6 +865,9 @@ export default {
       }
     },
     logout() {
+      this.clearSession();
+      this.clearGuestSession();
+      this.guestContents = [];
       this.token = "";
       this.user = null;
       this.users = [];
@@ -777,6 +879,11 @@ export default {
       this.selectedContent = null;
       this.showUploadModal = false;
       this.dashboardView = "library";
+      this.loginMode = "account";
+      this.loginError = "";
+      this.guestError = "";
+      this.userForm = { username: "", password: "" };
+      this.guestForm = { token: "", access_code: "" };
       this.view = "home";
     },
   },
@@ -788,14 +895,12 @@ export default {
   min-height: 100vh;
 }
 
-.dashboard {
-  border: 1px solid #e3e7f1;
-  border-radius: 14px;
-  padding: 1.5rem;
-  background: #ffffff;
-  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.08);
+.dashboard,
+.guest-dashboard {
+  background: transparent;
   display: grid;
-  gap: 1.5rem;
+  gap: 1.25rem;
+  min-height: 100vh;
 }
 
 .card,
@@ -826,6 +931,43 @@ input {
   border-radius: 8px;
   border: 1px solid #cbd5e1;
   font-size: 0.95rem;
+}
+
+.login-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0 1.25rem;
+  background: #f1f5f9;
+  padding: 0.25rem;
+  border-radius: 12px;
+}
+
+.login-tab {
+  flex: 1;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-tab--active {
+  background: #fff;
+  color: #312e81;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.login-error {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.88rem;
 }
 
 .ghost {

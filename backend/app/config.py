@@ -24,6 +24,9 @@ CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(","
 MEDIA_FOLDER = os.environ.get("MEDIA_FOLDER", "")
 # Racine des archives (originaux déplacés après optimisation). Vide = MEDIA_FOLDER/archives
 ARCHIVES_FOLDER = os.environ.get("ARCHIVES_FOLDER", "").strip()
+# Intégration Overseerr (recherche / découverte externe). Surchargés par app_settings si définis.
+OVERSEERR_URL = os.environ.get("OVERSEERR_URL", "").strip().rstrip("/")
+OVERSEERR_API_KEY = os.environ.get("OVERSEERR_API_KEY", "").strip()
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123456!")
 USER_USERNAME = os.environ.get("USER_USERNAME", "user")

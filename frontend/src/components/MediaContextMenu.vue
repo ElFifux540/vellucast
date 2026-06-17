@@ -12,7 +12,6 @@
         @mousedown.stop
       >
         <li role="menuitem" tabindex="0" @click="pick('info')">Voir les infos</li>
-        <li role="menuitem" tabindex="0" @click="pick('banner')">Changer la bannière</li>
         <li role="menuitem" tabindex="0" @click="pick('overseerr')">
           Corriger l'association (Overseerr)
         </li>
@@ -24,6 +23,15 @@
           @click="pick('no_optimize')"
         >
           {{ optimizeActionLabel }}
+        </li>
+        <li
+          v-if="showDoNotOptimize"
+          class="media-ctx-item-danger"
+          role="menuitem"
+          tabindex="0"
+          @click="pick('delete')"
+        >
+          Supprimer
         </li>
       </ul>
     </div>
@@ -139,5 +147,15 @@ export default {
   border-top: 1px solid #f1f5f9;
   margin-top: 0.2rem;
   padding-top: 0.55rem !important;
+}
+
+.media-ctx-item-danger {
+  color: #dc2626;
+  border-top: 1px solid #f1f5f9;
+}
+
+.media-ctx-item-danger:hover {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
 }
 </style>

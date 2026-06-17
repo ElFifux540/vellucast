@@ -25,12 +25,20 @@ def _b64decode(data: str) -> bytes:
     return base64.urlsafe_b64decode(data + padding)
 
 
-def create_token(username: str, role: str, ttl_minutes: int = TOKEN_TTL_MINUTES) -> str:
+def create_token(
+    username: str,
+    role: str,
+    ttl_minutes: int = TOKEN_TTL_MINUTES,
+    extra: dict | None = None,
+) -> str:
     payload = {
         "sub": username,
         "role": role,
         "exp": int((datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)).timestamp()),
     }
+    if extra:
+        # Claims additionnels (ex. cids = contenus autorisés pour un jeton invité).
+        payload.update(extra)
     payload_json = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     payload_b64 = _b64encode(payload_json)
     signature = hmac.new(

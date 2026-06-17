@@ -100,6 +100,15 @@ async def init_db() -> None:
         )
         await db.execute(
             """
+            CREATE TABLE IF NOT EXISTS share_link_contents (
+                share_id INTEGER NOT NULL,
+                content_id TEXT NOT NULL,
+                FOREIGN KEY (share_id) REFERENCES share_links (id)
+            )
+            """
+        )
+        await db.execute(
+            """
             CREATE TABLE IF NOT EXISTS share_link_usages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 share_id INTEGER NOT NULL,
@@ -134,7 +143,7 @@ async def init_db() -> None:
             )
             """
         )
-        for _key in ("movies_folder", "series_folder"):
+        for _key in ("movies_folder", "series_folder", "overseerr_url", "overseerr_api_key"):
             await db.execute(
                 "INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)",
                 (_key, ""),
@@ -273,8 +282,19 @@ async def seed_default_users() -> None:
     )
 
 
+# Colonnes de métadonnées enrichies (association Overseerr/TMDb), toutes nullables.
+CONTENT_METADATA_COLUMNS: dict[str, str] = {
+    "poster_url": "TEXT",
+    "backdrop_url": "TEXT",
+    "overview": "TEXT",
+    "year": "TEXT",
+    "tmdb_id": "TEXT",
+    "media_type": "TEXT",
+}
+
+
 async def _ensure_columns(db: aiosqlite.Connection) -> None:
-    """Migration : colonnes manquantes sur la table `contents` (ex. do_not_optimize, défaut faux)."""
+    """Migration : colonnes manquantes sur la table `contents` (do_not_optimize, métadonnées)."""
     columns: list[str] = []
     async with db.execute("PRAGMA table_info(contents)") as cursor:
         rows = await cursor.fetchall()
@@ -284,6 +304,10 @@ async def _ensure_columns(db: aiosqlite.Connection) -> None:
         await db.execute(
             "ALTER TABLE contents ADD COLUMN do_not_optimize INTEGER NOT NULL DEFAULT 0"
         )
+
+    for col_name, col_type in CONTENT_METADATA_COLUMNS.items():
+        if col_name not in columns:
+            await db.execute(f"ALTER TABLE contents ADD COLUMN {col_name} {col_type}")
 
 
 TRANSCODE_SETTING_DEFAULTS: dict[str, str] = {
@@ -597,6 +621,86 @@ async def list_contents() -> list[dict]:
             return [dict(row) for row in rows]
 
 
+async def search_contents(  # recherche serveur paginée (TFE: moteur de recherche bibliothèque)
+    query: str | None = None,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    """
+    Recherche serveur paginée dans la table contents (titre ou ID, insensible à la casse).
+
+    Retourne ``{items, total, limit, offset, query}``. Une requête vide renvoie tout
+    (triée par date de création décroissante), ce qui permet de remplacer le filtrage
+    client par une vraie recherche côté serveur.
+    """
+    q = (query or "").strip()
+    try:
+        limit = max(1, min(200, int(limit)))
+    except (TypeError, ValueError):
+        limit = 50
+    try:
+        offset = max(0, int(offset))
+    except (TypeError, ValueError):
+        offset = 0
+
+    # Sans requête : liste paginée triée par date (comportement « tout afficher »).
+    if not q:
+        async with _connect() as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT COUNT(*) AS n FROM contents") as cursor:
+                row = await cursor.fetchone()
+                total = int(row["n"]) if row else 0
+            async with db.execute(
+                "SELECT * FROM contents ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [limit, offset],
+            ) as cursor:
+                items = [dict(r) for r in await cursor.fetchall()]
+        return {"items": items, "total": total, "limit": limit, "offset": offset, "query": q}
+
+    # Avec requête : on récupère les correspondances puis on classe par pertinence en Python
+    # (façon Plex : un titre commençant par la requête remonte avant une sous-chaîne).
+    like = f"%{q.lower()}%"
+    async with _connect() as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM contents WHERE LOWER(title) LIKE ? OR LOWER(id) LIKE ?",
+            [like, like],
+        ) as cursor:
+            matched = [dict(r) for r in await cursor.fetchall()]
+
+    ranked = sorted(matched, key=lambda c: _relevance_key(c, q.lower()))
+    total = len(ranked)
+    items = ranked[offset : offset + limit]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "query": q}
+
+
+def _relevance_key(content: dict, q_lower: str) -> tuple:
+    """
+    Clé de tri par pertinence (plus petit = plus pertinent), façon moteur de recherche :
+      0 titre exact, 1 titre commence par la requête, 2 un mot du titre commence par la
+      requête, 3 requête en sous-chaîne du titre, 4 correspondance sur l'ID uniquement.
+    À pertinence égale, on départage par titre alphabétique.
+    """
+    title = str(content.get("title") or "").strip().lower()
+    cid = str(content.get("id") or "").strip().lower()
+    words = title.split()
+
+    if title == q_lower:
+        rank = 0
+    elif title.startswith(q_lower):
+        rank = 1
+    elif any(w.startswith(q_lower) for w in words):
+        rank = 2
+    elif q_lower in title:
+        rank = 3
+    elif q_lower in cid:
+        rank = 4
+    else:
+        rank = 5
+    return (rank, title)
+
+
 async def list_optimizable_contents() -> list[dict]:
     """Contenus éligibles à l'optimisation automatique (do_not_optimize = 0)."""
     async with _connect() as db:
@@ -613,7 +717,15 @@ async def update_content(content_id: str, payload: dict) -> dict:
     media_path = payload.get("media_path")
     do_not_optimize = payload.get("do_not_optimize")
 
-    if title is None and media_path is None and do_not_optimize is None:
+    # Champs de métadonnées présents dans le payload (None = non fourni).
+    metadata_present = any(k in payload for k in CONTENT_METADATA_COLUMNS)
+
+    if (
+        title is None
+        and media_path is None
+        and do_not_optimize is None
+        and not metadata_present
+    ):
         return {"ok": False, "error": "aucune modification fournie"}
 
     updates = []
@@ -641,6 +753,14 @@ async def update_content(content_id: str, payload: dict) -> dict:
         flag = 1 if bool(do_not_optimize) else 0
         updates.append("do_not_optimize = ?")
         params.append(flag)
+
+    # Métadonnées : chaîne vide -> NULL (permet d'effacer une association).
+    for col in CONTENT_METADATA_COLUMNS:
+        if col in payload:
+            raw = payload.get(col)
+            value = None if raw is None or str(raw).strip() == "" else str(raw).strip()
+            updates.append(f"{col} = ?")
+            params.append(value)
 
     if not updates:
         return {"ok": False, "error": "aucune modification fournie"}
@@ -681,14 +801,22 @@ async def delete_content(content_id: str, deleted_by: str | None) -> dict:
 
 
 async def create_share_link(payload: dict) -> dict:
-    content_id = payload.get("content_id")
-    if not content_id:
-        return {"ok": False, "error": "content_id requis"}
+    # Accepte une liste `content_ids` (multi-contenus) ou un `content_id` unique (compat).
+    raw_ids = payload.get("content_ids")
+    if raw_ids is None and payload.get("content_id"):
+        raw_ids = [payload.get("content_id")]
+    content_ids = [str(c).strip() for c in (raw_ids or []) if str(c).strip()]
+    # Déduplique en conservant l'ordre.
+    seen: set[str] = set()
+    content_ids = [c for c in content_ids if not (c in seen or seen.add(c))]
+    if not content_ids:
+        return {"ok": False, "error": "Sélectionnez au moins un contenu"}
 
-    content = await get_content(content_id)
-    if not content:
-        return {"ok": False, "error": "contenu introuvable"}
+    for cid in content_ids:
+        if not await get_content(cid):
+            return {"ok": False, "error": f"Contenu introuvable: {cid}"}
 
+    content_id = content_ids[0]  # premier contenu (colonne historique)
     token = secrets.token_urlsafe(24)
     created_at = _now_utc()
 
@@ -726,7 +854,7 @@ async def create_share_link(payload: dict) -> dict:
     access_code_hash = _hash_code(access_code) if access_code else None
 
     async with _connect() as db:
-        await db.execute(
+        cursor = await db.execute(
             """
             INSERT INTO share_links (
                 token, content_id, created_by, created_at, expires_at,
@@ -743,6 +871,11 @@ async def create_share_link(payload: dict) -> dict:
                 access_code_hash,
             ),
         )
+        share_id = cursor.lastrowid
+        await db.executemany(
+            "INSERT INTO share_link_contents (share_id, content_id) VALUES (?, ?)",
+            [(share_id, cid) for cid in content_ids],
+        )
         await db.commit()
 
     await log_audit(
@@ -751,7 +884,7 @@ async def create_share_link(payload: dict) -> dict:
         entity_type="share_link",
         entity_id=token,
         details={
-            "content_id": content_id,
+            "content_ids": content_ids,
             "expires_at": expires_at.isoformat() if expires_at else None,
             "max_uses": max_uses,
             "has_access_code": bool(access_code),
@@ -762,6 +895,7 @@ async def create_share_link(payload: dict) -> dict:
         "ok": True,
         "token": token,
         "content_id": content_id,
+        "content_ids": content_ids,
         "expires_at": expires_at.isoformat() if expires_at else None,
         "max_uses": max_uses,
     }
@@ -811,6 +945,13 @@ async def revoke_share_link(token: str, revoked_by: str | None) -> dict:
             """,
             (token,),
         )
+        await db.execute(
+            """
+            DELETE FROM share_link_contents
+            WHERE share_id IN (SELECT id FROM share_links WHERE token = ?)
+            """,
+            (token,),
+        )
         await db.execute("DELETE FROM share_links WHERE token = ?", (token,))
         await db.commit()
 
@@ -822,6 +963,21 @@ async def revoke_share_link(token: str, revoked_by: str | None) -> dict:
     )
 
     return {"ok": True}
+
+
+async def _share_content_ids(share_id: int, fallback_content_id: str | None) -> list[str]:  # multi-contenus
+    """Liste des contenus d'un partage (table share_link_contents) ; repli sur la colonne historique."""
+    async with _connect() as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT content_id FROM share_link_contents WHERE share_id = ?",
+            (share_id,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+    ids = [r["content_id"] for r in rows]
+    if not ids and fallback_content_id:
+        ids = [fallback_content_id]
+    return ids
 
 
 async def _get_share_by_token(token: str) -> dict | None:
@@ -850,9 +1006,11 @@ async def validate_share_link(token: str) -> dict | None:
     max_uses = share.get("max_uses")
     if max_uses is not None and share.get("used_count", 0) >= max_uses:
         return None
+    content_ids = await _share_content_ids(share["id"], share.get("content_id"))
     return {
         "token": share["token"],
         "content_id": share["content_id"],
+        "content_ids": content_ids,
         "created_by": share.get("created_by"),
         "created_at": share["created_at"],
         "expires_at": share.get("expires_at"),
@@ -915,9 +1073,12 @@ async def use_share_link(
         details={"content_id": share["content_id"]},
     )
 
+    content_ids = await _share_content_ids(share["id"], share.get("content_id"))
+
     return {
         "ok": True,
         "content_id": share["content_id"],
+        "content_ids": content_ids,
         "used_at": used_at,
     }
 
@@ -946,6 +1107,52 @@ async def get_media_folder_settings() -> dict[str, str]:
     for row in rows:
         out[row["key"]] = (row["value"] or "").strip()
     return out
+
+
+async def get_overseerr_settings() -> dict[str, str]:
+    """Lit l'URL et la clé API Overseerr depuis app_settings (override des variables d'env)."""
+    async with _connect() as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT key, value FROM app_settings WHERE key IN ('overseerr_url', 'overseerr_api_key')",
+        ) as cursor:
+            rows = await cursor.fetchall()
+    out: dict[str, str] = {"overseerr_url": "", "overseerr_api_key": ""}
+    for row in rows:
+        out[row["key"]] = (row["value"] or "").strip()
+    return out
+
+
+async def update_overseerr_settings(
+    overseerr_url: str | None,
+    overseerr_api_key: str | None,
+    *,
+    updated_by: str | None,
+) -> dict:
+    """Met à jour la configuration Overseerr (URL normalisée sans slash final)."""
+    url = (overseerr_url or "").strip().rstrip("/")
+    key = (overseerr_api_key or "").strip()
+
+    async with _connect() as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)",
+            ("overseerr_url", url),
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)",
+            ("overseerr_api_key", key),
+        )
+        await db.commit()
+
+    await log_audit(
+        action="overseerr_settings_updated",
+        actor=updated_by,
+        entity_type="app_settings",
+        entity_id="overseerr",
+        # La clé API n'est jamais journalisée en clair.
+        details={"overseerr_url": url, "overseerr_api_key_set": bool(key)},
+    )
+    return {"ok": True, "overseerr_url": url, "overseerr_api_key_set": bool(key)}
 
 
 async def update_media_folder_settings(
@@ -1064,10 +1271,17 @@ async def get_transcoding_settings() -> dict[str, str]:
 
 
 async def get_all_app_settings() -> dict[str, str]:
-    """Dossiers médias + transcodage pour l'API admin."""
+    """Dossiers médias + transcodage + Overseerr pour l'API admin.
+
+    La clé API Overseerr n'est jamais renvoyée en clair : seul un booléen
+    ``overseerr_api_key_set`` indique sa présence.
+    """
     folders = await get_media_folder_settings()
     trans = await get_transcoding_settings()
-    return {**folders, **trans}
+    overseerr = await get_overseerr_settings()
+    api_key = overseerr.pop("overseerr_api_key", "")
+    overseerr["overseerr_api_key_set"] = bool(api_key)
+    return {**folders, **trans, **overseerr}
 
 
 def _bool_to_setting(v: Any) -> str:

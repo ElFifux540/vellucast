@@ -14,6 +14,14 @@ from .scanner import scan_media_folder
 from .streaming import router as streaming_router
 from .upload import store_uploaded_media
 from .optimizer import start_optimizer_worker, stop_optimizer_worker
+from .hls import manager as hls_manager
+from .search import search_disk_files
+from .transcoder import transcode_mkv_to_web_mp4
+from .overseerr import (
+    OverseerrError,
+    OverseerrNotConfigured,
+    search_external,
+)
 from .db import (
     authenticate_user,
     admin_reset_password,
@@ -24,12 +32,15 @@ from .db import (
     get_content,
     get_all_app_settings,
     get_media_folder_settings,
+    get_overseerr_settings,
     init_db,
     list_users,
     list_audit_logs,
     list_contents,
     list_share_links,
+    search_contents,
     update_media_folder_settings,
+    update_overseerr_settings,
     toggle_content_do_not_optimize,
     update_transcoding_settings,
     update_user_password,
@@ -41,7 +52,7 @@ from .db import (
 )
 
 
-app = FastAPI(title="Vellucast")
+app = FastAPI(title="Vellucast")  # API Vellucast (TFE)
 
 app.include_router(streaming_router)
 
@@ -69,11 +80,13 @@ async def on_startup() -> None:
     validate_security_settings()
     await init_db()
     start_optimizer_worker()
+    await hls_manager.start_reaper()
 
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
     await stop_optimizer_worker()
+    await hls_manager.shutdown()
 
 
 @app.get("/health")
@@ -154,6 +167,19 @@ async def login(payload: dict, request: Request) -> dict:
     return {"ok": True, "user": user, "token": token}
 
 
+@app.get("/auth/me")
+async def auth_me(user: dict = Depends(get_current_user)) -> dict:
+    """Valide le jeton stocké côté client (persistance de session) et renvoie l'utilisateur.
+
+    Pour un jeton invité expiré/invalide, le serveur renvoie 401 → la session côté client
+    est détruite (le « cookie » cesse de fonctionner quand le jeton meurt).
+    """
+    out = {"ok": True, "user": {"username": user.get("sub"), "role": user.get("role")}}
+    if user.get("role") == "guest":
+        out["cids"] = user.get("cids") or []
+    return out
+
+
 @app.post("/auth/guest")
 async def guest_login(payload: dict, request: Request) -> dict:
     token = payload.get("token")
@@ -167,17 +193,35 @@ async def guest_login(payload: dict, request: Request) -> dict:
         token=token,
         access_code=access_code,
         used_by="guest",
-        ip_address=None,
-        user_agent=None,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
     )
     if not result["ok"]:
         raise HTTPException(status_code=400, detail=result["error"])
 
-    content = await get_content(result["content_id"])
-    if not content:
+    content_ids = result.get("content_ids") or (
+        [result["content_id"]] if result.get("content_id") else []
+    )
+    contents = []
+    for cid in content_ids:
+        c = await get_content(cid)
+        if c:
+            contents.append(c)
+    if not contents:
         raise HTTPException(status_code=404, detail="Contenu introuvable")
 
-    return {"ok": True, "content": content, "used_at": result["used_at"]}
+    # Jeton invité scopé : ne donne accès qu'aux contenus partagés (claim cids).
+    guest_token = create_token(
+        "guest",
+        "guest",
+        extra={"cids": [c["id"] for c in contents]},
+    )
+    return {
+        "ok": True,
+        "token": guest_token,
+        "contents": contents,
+        "used_at": result["used_at"],
+    }
 
 
 @app.post("/auth/change-password")
@@ -320,7 +364,72 @@ async def api_put_settings(payload: dict, user: dict = Depends(require_admin)) -
         await update_media_folder_settings(m, s, updated_by=actor)
     if any(k in payload for k in _TRANSCODE_PAYLOAD_KEYS):
         await update_transcoding_settings(payload, updated_by=actor)
+    if "overseerr_url" in payload or "overseerr_api_key" in payload:
+        current = await get_overseerr_settings()
+        url = payload.get("overseerr_url", current["overseerr_url"])
+        # Clé vide = on conserve l'existante (ne jamais effacer par omission UI).
+        raw_key = payload.get("overseerr_api_key")
+        api_key = raw_key if raw_key not in (None, "") else current["overseerr_api_key"]
+        await update_overseerr_settings(url, api_key, updated_by=actor)
     return await get_all_app_settings()
+
+
+@app.get("/api/search/library")
+async def api_search_library(
+    q: str | None = Query(None, description="Texte recherché (titre ou ID)"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Recherche serveur paginée dans la bibliothèque indexée (table contents)."""
+    _ = user
+    return await search_contents(q, limit=limit, offset=offset)
+
+
+@app.get("/api/search/disk")
+async def api_search_disk(
+    q: str | None = Query(None, description="Sous-chaîne du nom de fichier / chemin"),
+    limit: int = Query(100, ge=1, le=500),
+    user: dict = Depends(require_admin),
+) -> dict:
+    """Recherche récursive de fichiers vidéo sous MEDIA_FOLDER (admin)."""
+    _ = user
+    try:
+        return await search_disk_files(q, limit=limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
+
+@app.get("/api/search/external")
+async def api_search_external(
+    q: str = Query(..., description="Titre du film / de la série"),
+    page: int = Query(1, ge=1),
+    user: dict = Depends(require_admin),
+) -> dict:
+    """Recherche de découverte via Overseerr/TMDb (admin)."""
+    _ = user
+    try:
+        return await search_external(q, page=page)
+    except OverseerrNotConfigured as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    except OverseerrError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from None
+
+
+@app.post("/api/contents/{content_id}/transcode")
+async def api_transcode_content(
+    content_id: str,
+    user: dict = Depends(require_admin),
+) -> dict:
+    """
+    Lance un transcodage manuel MKV → MP4 web (H.264/AAC) pour un contenu.
+
+    Expose le service transcoder.py jusqu'ici présent mais non accessible via l'API.
+    """
+    result = await transcode_mkv_to_web_mp4(content_id)
+    if not result["ok"]:
+        raise HTTPException(status_code=400, detail=result.get("error", "Transcodage impossible"))
+    return result
 
 
 @app.post("/api/upload")

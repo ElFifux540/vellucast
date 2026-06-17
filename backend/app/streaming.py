@@ -1,4 +1,4 @@
-"""Streaming vidéo avec support HTTP Range (206) et lecture par chunks."""
+"""Streaming vidéo : HTTP Range (206) + transcodage HLS à la volée (TFE)."""
 
 from __future__ import annotations
 
@@ -13,12 +13,34 @@ from starlette.responses import Response, StreamingResponse
 
 from .auth import verify_token
 from .config import MEDIA_FOLDER
-from .db import get_content
+from .db import get_content, get_transcoding_settings
+from .hls import decide_playback, manager
 from .optimizer import media_file_read_begin, media_file_read_end
 
 router = APIRouter(prefix="/api", tags=["stream"])
 
-CHUNK_SIZE = 64 * 1024
+CHUNK_SIZE = 64 * 1024  # taille de lecture par bloc
+
+
+async def _resolve_media_abs_path(content_id: str) -> str:
+    """Récupère le chemin absolu du média d'un contenu (404/403 sinon)."""
+    row = await get_content(content_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Contenu introuvable")
+    media_path = row["media_path"]
+    abs_path = os.path.normpath(os.path.abspath(media_path))
+    if not os.path.isfile(abs_path):
+        raise HTTPException(status_code=404, detail="Fichier media introuvable sur le disque")
+    _ensure_path_allowed(abs_path)
+    return abs_path
+
+
+def _authorize_guest(user: dict, content_id: str) -> None:
+    """Un jeton invité ne peut lire que les contenus inclus dans son lien de partage (claim cids)."""
+    if user.get("role") == "guest":
+        allowed = user.get("cids") or []
+        if content_id not in allowed:
+            raise HTTPException(status_code=403, detail="Contenu non autorisé pour ce lien")
 
 
 def get_stream_user(request: Request) -> dict:
@@ -136,7 +158,7 @@ async def stream_content(
     request: Request,
     user: dict = Depends(get_stream_user),
 ):
-    _ = user
+    _authorize_guest(user, content_id)
     row = await get_content(content_id)
     if not row:
         raise HTTPException(status_code=404, detail="Contenu introuvable")
@@ -221,4 +243,88 @@ async def stream_content(
             "Content-Range": f"bytes {start}-{end}/{file_size}",
             "Content-Length": str(chunk_len),
         },
+    )
+
+
+async def _stream_preset() -> tuple[bool, str]:
+    """(transcodage_actif, preset) depuis app_settings."""
+    settings = await get_transcoding_settings()
+    enabled = str(settings.get("stream_transcode_enabled", "0")).strip() in ("1", "true", "on")
+    preset = str(settings.get("stream_transcode_preset", "3")).strip() or "3"
+    return enabled, preset
+
+
+@router.get("/stream/{content_id}/info")
+async def stream_info(
+    content_id: str,
+    user: dict = Depends(get_stream_user),
+) -> dict:
+    """
+    Indique au client le mode de lecture recommandé : ``direct`` ou ``hls``.
+
+    Le frontend appelle cet endpoint avant de choisir entre la balise <video> brute
+    et le lecteur hls.js.
+    """
+    _authorize_guest(user, content_id)
+    abs_path = await _resolve_media_abs_path(content_id)
+    enabled, _preset = await _stream_preset()
+    try:
+        decision = await decide_playback(abs_path, transcode_enabled=enabled)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from None
+    return {"content_id": content_id, "transcode_enabled": enabled, **decision}
+
+
+@router.get("/stream/{content_id}/hls/index.m3u8")
+async def stream_hls_playlist(
+    content_id: str,
+    user: dict = Depends(get_stream_user),
+):
+    """Démarre (ou réutilise) une session HLS et renvoie la playlist .m3u8."""
+    _authorize_guest(user, content_id)
+    abs_path = await _resolve_media_abs_path(content_id)
+    enabled, preset = await _stream_preset()
+    if not enabled:
+        raise HTTPException(status_code=409, detail="Transcodage à la volée désactivé")
+
+    try:
+        session = await manager.get_session(content_id, abs_path, preset)
+        playlist = await asyncio.to_thread(session.read_playlist)
+    except (RuntimeError, TimeoutError) as e:
+        raise HTTPException(status_code=503, detail=f"Transcodage HLS indisponible: {e}") from None
+
+    return Response(
+        content=playlist,
+        media_type="application/vnd.apple.mpegurl",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@router.get("/stream/{content_id}/hls/{segment}")
+async def stream_hls_segment(
+    content_id: str,
+    segment: str,
+    user: dict = Depends(get_stream_user),
+):
+    """Sert un segment .ts produit par la session HLS du contenu."""
+    _authorize_guest(user, content_id)
+    if not segment.endswith(".ts"):
+        raise HTTPException(status_code=404, detail="Segment invalide")
+
+    abs_path = await _resolve_media_abs_path(content_id)
+    enabled, preset = await _stream_preset()
+    if not enabled:
+        raise HTTPException(status_code=409, detail="Transcodage à la volée désactivé")
+
+    session = await manager.get_session(content_id, abs_path, preset)
+    seg_path = session.segment_path(segment)
+    if seg_path is None:
+        # Segment pas encore produit : le client réessaiera.
+        raise HTTPException(status_code=404, detail="Segment indisponible (en cours de production)")
+
+    data = await asyncio.to_thread(lambda: open(seg_path, "rb").read())
+    return Response(
+        content=data,
+        media_type="video/mp2t",
+        headers={"Cache-Control": "no-cache"},
     )

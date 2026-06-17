@@ -1,12 +1,30 @@
 <template>
-  <div class="settings-view space-y-6">
+  <div class="settings-view">
     <h1 class="settings-page-title text-2xl font-bold tracking-tight text-slate-900">
       <span class="settings-brand">Vellucast</span>
       <span class="settings-page-sub">Paramètres</span>
     </h1>
 
-    <section v-if="dashboardApp.user?.role === 'admin'" class="card">
-      <h2>Dossiers médias Vellucast</h2>
+    <div class="settings-layout">
+      <!-- Barre latérale : sélection de la sous-section -->
+      <nav class="settings-nav" aria-label="Sections des paramètres">
+        <button
+          v-for="item in navItems"
+          :key="item.key"
+          type="button"
+          class="settings-nav-item"
+          :class="{ 'settings-nav-item--active': section === item.key }"
+          @click="section = item.key"
+        >
+          <span class="settings-nav-ico">{{ item.icon }}</span>
+          <span>{{ item.label }}</span>
+        </button>
+      </nav>
+
+      <!-- Contenu de la sous-section sélectionnée -->
+      <div class="settings-content">
+        <section v-show="section === 'library_folders'" v-if="dashboardApp.user?.role === 'admin'" class="card">
+          <h2>Dossiers médias Vellucast</h2>
       <p class="text-sm text-slate-600">
         Dossiers de base utilisés pour les uploads (films et séries). Les chemins doivent rester sous
         <code class="rounded bg-slate-100 px-1 py-0.5 text-xs">MEDIA_FOLDER</code> si celui-ci est défini côté serveur.
@@ -30,7 +48,9 @@
       </form>
     </section>
 
-    <section v-if="dashboardApp.user?.role === 'admin'" class="card transcoding-settings-card">
+        <ServerSearchPanel v-show="section === 'search'" v-if="dashboardApp.user?.role === 'admin'" />
+
+        <section v-show="section === 'transcoding'" v-if="dashboardApp.user?.role === 'admin'" class="card transcoding-settings-card">
       <h2>Paramètres de Transcodage</h2>
       <p class="mb-4 text-sm text-slate-600">
         Réglages du transcodage en direct et de l’optimisation automatique (persistés en base,
@@ -124,7 +144,7 @@
       </form>
     </section>
 
-    <section v-if="dashboardApp.user?.role === 'admin'" class="card">
+        <section v-show="section === 'users'" v-if="dashboardApp.user?.role === 'admin'" class="card">
       <h2>Utilisateurs Vellucast</h2>
       <div class="admin-grid">
         <form @submit.prevent="submitCreateUser">
@@ -236,7 +256,7 @@
       </div>
     </section>
 
-    <section v-if="dashboardApp.user?.role === 'admin'" class="card">
+        <section v-show="section === 'content'" v-if="dashboardApp.user?.role === 'admin'" class="card">
       <h2>Contenus Vellucast</h2>
       <button type="button" class="btn-primary" @click="dashboardApp.showUploadModal = true">
         Ajouter un média
@@ -558,49 +578,41 @@
       {{ toastMessage }}
     </div>
 
-    <section v-if="dashboardApp.user?.role === 'admin'" class="card">
+        <section v-show="section === 'shares'" v-if="dashboardApp.user?.role === 'admin'" class="card">
       <h2>Liens temporaires Vellucast</h2>
       <form @submit.prevent="submitCreateShare">
-        <div class="content-search-wrap content-search-wrap--share">
+        <div class="share-picker">
           <label>
-            Contenu cible (recherche par titre ou ID)
+            Contenus à partager (cochez un ou plusieurs)
             <input
               v-model="shareSearchQuery"
               type="search"
               autocomplete="off"
-              placeholder="Tapez le nom d'un film, une série ou un ID…"
-              @focus="onShareSearchFocus"
-              @blur="onShareSearchBlur"
+              placeholder="Filtrer par titre ou ID…"
             />
           </label>
-          <ul
-            v-if="showShareSuggestions"
-            class="content-search-dropdown"
-            role="listbox"
-            aria-label="Contenus correspondants"
-          >
-            <li
-              v-for="c in filteredContentsForShare"
-              :key="c.id"
-              role="option"
-              class="content-search-item"
-              @mousedown.prevent="selectContentForShare(c)"
+          <div class="share-checklist">
+            <label v-for="c in shareContentChoices" :key="c.id" class="share-check">
+              <input type="checkbox" :value="c.id" v-model="dashboardApp.shareForm.content_ids" />
+              <span class="share-check-title">{{ c.title }}</span>
+              <span class="share-check-id">{{ c.id }}</span>
+            </label>
+            <p v-if="shareContentChoices.length === 0" class="content-search-hint">
+              Aucun contenu ne correspond.
+            </p>
+          </div>
+          <p class="share-selected-count">
+            {{ dashboardApp.shareForm.content_ids.length }} contenu(s) sélectionné(s)
+            <button
+              v-if="dashboardApp.shareForm.content_ids.length"
+              type="button"
+              class="ghost text-sm"
+              @click="dashboardApp.shareForm.content_ids = []"
             >
-              <span class="content-search-title">{{ c.title }}</span>
-              <span class="content-search-id">{{ c.id }}</span>
-            </li>
-          </ul>
-          <p v-if="showShareNoResults" class="content-search-hint">
-            Aucun contenu ne correspond à cette recherche.
+              Tout décocher
+            </button>
           </p>
         </div>
-        <p v-if="dashboardApp.shareForm.content_id" class="share-selection-pill">
-          <span class="share-selection-label">ID sélectionné :</span>
-          <code class="share-selection-id">{{ dashboardApp.shareForm.content_id }}</code>
-          <button type="button" class="ghost text-sm shrink-0" @click="clearShareContentSelection">
-            Effacer
-          </button>
-        </p>
         <label>
           Durée
           <div class="duration-row">
@@ -753,6 +765,81 @@
         </div>
       </div>
     </section>
+
+        <!-- Affichage : taille des affiches, propre à chaque utilisateur (ce navigateur) -->
+        <section v-show="section === 'display'" class="card">
+          <h2>Affichage</h2>
+          <p class="text-sm text-slate-600">
+            Taille des affiches dans la bibliothèque. Ce réglage est propre à votre compte sur ce
+            navigateur.
+          </p>
+          <div class="display-size">
+            <button
+              v-for="opt in posterSizeOptions"
+              :key="opt.key"
+              type="button"
+              class="display-size-btn"
+              :class="{ 'display-size-btn--active': posterSize === opt.key }"
+              @click="setPosterSize(opt.key)"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+
+          <h3 class="display-subtitle">Thème</h3>
+          <p class="text-sm text-slate-600">
+            « Auto » suit le thème de votre système (clair / sombre).
+          </p>
+          <div class="display-size">
+            <button
+              v-for="opt in themeOptions"
+              :key="opt.key"
+              type="button"
+              class="display-size-btn"
+              :class="{ 'display-size-btn--active': theme === opt.key }"
+              @click="setThemeMode(opt.key)"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </section>
+
+        <!-- Mot de passe (disponible pour tous les comptes) -->
+        <section v-show="section === 'password'" class="card">
+          <h2>Changer le mot de passe</h2>
+          <p class="text-sm text-slate-600">Mettez à jour le mot de passe de votre compte.</p>
+          <form class="mt-3 grid gap-3" @submit.prevent="dashboardApp.changePassword()">
+            <label>
+              Mot de passe actuel
+              <input
+                v-model="dashboardApp.passwordForm.current_password"
+                type="password"
+                autocomplete="current-password"
+              />
+            </label>
+            <label>
+              Nouveau mot de passe
+              <input
+                v-model="dashboardApp.passwordForm.new_password"
+                type="password"
+                autocomplete="new-password"
+              />
+            </label>
+            <label>
+              Confirmation
+              <input
+                v-model="dashboardApp.passwordForm.new_password_confirm"
+                type="password"
+                autocomplete="new-password"
+              />
+            </label>
+            <div class="row">
+              <button type="submit" class="btn-primary">Mettre à jour</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -760,6 +847,8 @@
 import { API_BASE } from "../config.js";
 import ServerBrowseModal from "./ServerBrowseModal.vue";
 import MediaContextMenu from "./MediaContextMenu.vue";
+import ServerSearchPanel from "./ServerSearchPanel.vue";
+import { getTheme, setTheme } from "../theme.js";
 
 /** Rôles autorisés côté interface (alignés sur le backend). */
 const ALLOWED_ROLES = ["user", "admin"];
@@ -783,10 +872,23 @@ function parseSeriesFromTitle(title) {
 
 export default {
   name: "Settings",
-  components: { ServerBrowseModal, MediaContextMenu },
+  components: { ServerBrowseModal, MediaContextMenu, ServerSearchPanel },
   inject: ["dashboardApp"],
   data() {
     return {
+      section: "library_folders",
+      posterSize: "medium",
+      posterSizeOptions: [
+        { key: "small", label: "Petites" },
+        { key: "medium", label: "Moyennes" },
+        { key: "large", label: "Grandes" },
+      ],
+      theme: "auto",
+      themeOptions: [
+        { key: "auto", label: "Auto" },
+        { key: "light", label: "Clair" },
+        { key: "dark", label: "Sombre" },
+      ],
       allowedRoles: ALLOWED_ROLES,
       folderForm: {
         movies_folder: "",
@@ -839,6 +941,25 @@ export default {
     };
   },
   computed: {
+    isAdmin() {
+      return this.dashboardApp?.user?.role === "admin";
+    },
+    navItems() {
+      // Sous-menus des paramètres ; les sections admin sont masquées aux comptes simples.
+      const admin = [
+        { key: "library_folders", label: "Dossiers médias", icon: "📁" },
+        { key: "search", label: "Recherche & découverte", icon: "🔎" },
+        { key: "transcoding", label: "Transcodage", icon: "🎞️" },
+        { key: "users", label: "Utilisateurs", icon: "👥" },
+        { key: "content", label: "Contenus", icon: "🎬" },
+        { key: "shares", label: "Liens temporaires", icon: "🔗" },
+      ];
+      const common = [
+        { key: "display", label: "Affichage", icon: "🖼️" },
+        { key: "password", label: "Mot de passe", icon: "🔒" },
+      ];
+      return this.isAdmin ? [...admin, ...common] : common;
+    },
     transcodeQualityLabel() {
       const q = this.transcodeForm.stream_transcode_preset;
       const labels = {
@@ -911,6 +1032,16 @@ export default {
         return title.includes(q) || id.includes(q);
       });
     },
+    shareContentChoices() {
+      // Liste à cocher : tous les contenus, filtrés si une recherche est saisie.
+      const q = (this.shareSearchQuery || "").trim().toLowerCase();
+      const list = this.dashboardApp.contents || [];
+      if (!q) return list;
+      return list.filter(
+        (c) =>
+          (c.title || "").toLowerCase().includes(q) || (c.id || "").toLowerCase().includes(q),
+      );
+    },
     showShareSuggestions() {
       return (
         this.shareDropdownOpen &&
@@ -927,6 +1058,15 @@ export default {
     },
   },
   async mounted() {
+    // Comptes simples : seul le sous-menu « mot de passe » est disponible.
+    if (!this.isAdmin) this.section = "password";
+    this.theme = getTheme();
+    try {
+      const s = localStorage.getItem("vellucast_poster_size");
+      if (s && ["small", "medium", "large"].includes(s)) this.posterSize = s;
+    } catch (e) {
+      /* no-op */
+    }
     await this.loadFolderSettings();
     if (typeof this.dashboardApp.resetContentCreateForm === "function") {
       this.dashboardApp.resetContentCreateForm();
@@ -938,6 +1078,20 @@ export default {
     if (this.shareBlurTimer) clearTimeout(this.shareBlurTimer);
   },
   methods: {
+    setPosterSize(key) {
+      this.posterSize = key;
+      try {
+        localStorage.setItem("vellucast_poster_size", key);
+      } catch (e) {
+        /* no-op */
+      }
+      // Notifie la bibliothèque (mise à jour en direct si elle est montée).
+      window.dispatchEvent(new Event("vellucast-poster-size"));
+    },
+    setThemeMode(key) {
+      this.theme = key;
+      setTheme(key);
+    },
     sortedSeasonsFor(seriesName) {
       return Object.keys(this.seriesTree[seriesName] || {})
         .map(Number)
@@ -1148,9 +1302,9 @@ export default {
     async submitCreateShare() {
       this.shareFormError = "";
       this.shareFormSuccess = "";
-      if (!(this.dashboardApp.shareForm.content_id || "").trim()) {
-        this.shareFormError =
-          "Sélectionnez un contenu dans la liste de résultats (recherche par titre ou ID).";
+      const ids = this.dashboardApp.shareForm.content_ids || [];
+      if (!ids.length) {
+        this.shareFormError = "Cochez au moins un contenu à partager.";
         return;
       }
       const res = await this.dashboardApp.createShare();
@@ -1442,6 +1596,172 @@ export default {
 </script>
 
 <style scoped>
+/* Mise en page Paramètres : barre latérale de sous-menus + contenu. */
+.settings-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.settings-layout {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.settings-nav {
+  flex: 0 0 240px;
+  position: sticky;
+  top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: #fff;
+  border: 1px solid #e3e7f1;
+  border-radius: 14px;
+  padding: 0.6rem;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.06);
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #334155;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.settings-nav-item:hover {
+  background: #f1f5f9;
+}
+
+.settings-nav-item--active {
+  background: #1e1b4b;
+  color: #fff;
+}
+
+.settings-nav-ico {
+  font-size: 1.05rem;
+}
+
+.settings-content {
+  flex: 1;
+  min-width: 0;
+  /* Hauteur stable : changer de sous-section ne fait plus « sauter » la fenêtre. */
+  min-height: 78vh;
+}
+
+.display-size {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.display-subtitle {
+  margin: 1.5rem 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.display-size-btn {
+  padding: 0.55rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.display-size-btn--active {
+  background: #1e1b4b;
+  border-color: #1e1b4b;
+  color: #fff;
+}
+
+.share-picker {
+  margin-bottom: 0.5rem;
+}
+
+.share-checklist {
+  margin-top: 0.5rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.share-check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.share-check:hover {
+  background: #f1f5f9;
+}
+
+.share-check-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1e293b;
+}
+
+.share-check-id {
+  font-family: ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.share-selected-count {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+/* Responsive : la barre latérale passe au-dessus du contenu sur petit écran. */
+@media (max-width: 760px) {
+  .settings-layout {
+    flex-direction: column;
+  }
+  .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    flex-basis: auto;
+    position: static;
+  }
+  .settings-nav-item {
+    width: auto;
+    flex: 1 1 auto;
+  }
+}
+
 /* Aligné sur les champs input du dashboard (bordures, padding, police). */
 .role-select {
   width: 100%;
