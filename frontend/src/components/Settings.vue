@@ -802,6 +802,26 @@
               {{ opt.label }}
             </button>
           </div>
+
+          <h3 class="display-subtitle">Couleur d'accent</h3>
+          <p class="text-sm text-slate-600">
+            La palette s'applique à toute l'interface, en clair comme en sombre.
+          </p>
+          <div class="accent-grid">
+            <button
+              v-for="opt in accentOptions"
+              :key="opt.key"
+              type="button"
+              class="accent-swatch"
+              :class="{ 'accent-swatch--active': accent === opt.key }"
+              :style="{ background: 'linear-gradient(135deg,' + opt.c1 + ',' + opt.c2 + ')' }"
+              :title="opt.label"
+              :aria-label="opt.label"
+              @click="setAccentColor(opt.key)"
+            >
+              <span v-if="accent === opt.key" class="accent-check">✓</span>
+            </button>
+          </div>
         </section>
 
         <!-- Mot de passe (disponible pour tous les comptes) -->
@@ -848,7 +868,7 @@ import { API_BASE } from "../config.js";
 import ServerBrowseModal from "./ServerBrowseModal.vue";
 import MediaContextMenu from "./MediaContextMenu.vue";
 import ServerSearchPanel from "./ServerSearchPanel.vue";
-import { getTheme, setTheme } from "../theme.js";
+import { getTheme, setTheme, getAccent, setAccent } from "../theme.js";
 
 /** Rôles autorisés côté interface (alignés sur le backend). */
 const ALLOWED_ROLES = ["user", "admin"];
@@ -888,6 +908,15 @@ export default {
         { key: "auto", label: "Auto" },
         { key: "light", label: "Clair" },
         { key: "dark", label: "Sombre" },
+      ],
+      accent: "indigo",
+      accentOptions: [
+        { key: "indigo", label: "Indigo", c1: "#4f46e5", c2: "#7c3aed" },
+        { key: "violet", label: "Violet", c1: "#7c3aed", c2: "#9333ea" },
+        { key: "emerald", label: "Émeraude", c1: "#047857", c2: "#0d9488" },
+        { key: "ocean", label: "Océan", c1: "#0e7490", c2: "#0369a1" },
+        { key: "rose", label: "Rose", c1: "#be123c", c2: "#db2777" },
+        { key: "amber", label: "Ambre", c1: "#b45309", c2: "#c2410c" },
       ],
       allowedRoles: ALLOWED_ROLES,
       folderForm: {
@@ -1061,6 +1090,7 @@ export default {
     // Comptes simples : seul le sous-menu « mot de passe » est disponible.
     if (!this.isAdmin) this.section = "password";
     this.theme = getTheme();
+    this.accent = getAccent();
     try {
       const s = localStorage.getItem("vellucast_poster_size");
       if (s && ["small", "medium", "large"].includes(s)) this.posterSize = s;
@@ -1091,6 +1121,10 @@ export default {
     setThemeMode(key) {
       this.theme = key;
       setTheme(key);
+    },
+    setAccentColor(key) {
+      this.accent = key;
+      setAccent(key);
     },
     sortedSeasonsFor(seriesName) {
       return Object.keys(this.seriesTree[seriesName] || {})
@@ -1671,6 +1705,41 @@ export default {
   font-size: 1rem;
   font-weight: 700;
   color: #1e293b;
+}
+
+.accent-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+}
+
+.accent-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  transition: transform 0.12s ease;
+}
+
+.accent-swatch:hover {
+  transform: scale(1.08);
+}
+
+.accent-swatch--active {
+  border-color: var(--vc-text, #1e293b);
+  box-shadow: 0 0 0 3px var(--vc-accent-soft, #eef2ff);
+}
+
+.accent-check {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .display-size-btn {

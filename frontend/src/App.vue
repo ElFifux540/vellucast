@@ -140,7 +140,7 @@
       <section
         v-else-if="view === 'guest-dashboard'"
         key="guest-dashboard"
-        class="guest-dashboard w-full px-4 py-5 sm:px-6 lg:px-10"
+        class="guest-dashboard w-full px-4 py-2 sm:px-6 lg:px-10"
       >
         <nav class="nav">
           <div class="nav-left">
@@ -167,7 +167,7 @@
         </button>
       </section>
 
-      <section v-else key="dashboard" class="dashboard w-full px-4 py-5 sm:px-6 lg:px-10">
+      <section v-else key="dashboard" class="dashboard w-full px-4 py-2 sm:px-6 lg:px-10">
         <nav class="nav">
           <div class="nav-left">
             <span class="app-brand" title="Vellucast">Vellucast</span>
@@ -898,8 +898,9 @@ export default {
 .dashboard,
 .guest-dashboard {
   background: transparent;
-  display: grid;
-  gap: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
   min-height: 100vh;
 }
 
@@ -1002,8 +1003,8 @@ input {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  padding-bottom: 1rem;
+  gap: 0.75rem;
+  padding-bottom: 0.35rem;
   border-bottom: 1px solid #e5e7eb;
 }
 
